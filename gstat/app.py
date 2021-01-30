@@ -76,31 +76,41 @@ inputsForm = [
     html.H5('Lag binning'),
     dbc.Row([
         dbc.Col([
-            html.P('Binning function:'),
-            dcc.RadioItems(
-                id='bin-function',
-                options=[
-                    {'label': 'Evenly spaced edges', 'value': 'even'},
-                    {'label': 'Uniform bin sizes', 'value': 'uniform'}
-                ],
-                value='even'
-            ),
-            html.P([
-                html.Strong('Maximum lag distance'),
-                html.Br(),
-                html.Span('Use the one of the functions below, or click on the graph to set a maximum lag.')
+            dbc.Row([
+                dbc.Col([
+                    html.P([
+                        html.Strong('Binning function'),
+                        html.Br(),
+                        html.Span('There are multiple options how the Variogram can automatically lag bin edges')
+                    ]),
+                    dcc.RadioItems(
+                        id='bin-function',
+                        options=[
+                            {'label': 'Evenly spaced edges', 'value': 'even'},
+                            {'label': 'Uniform bin sizes', 'value': 'uniform'}
+                        ],
+                        value='even'
+                    ),
+                ]),
+                dbc.Col([
+                    html.P([
+                        html.Strong('Maximum lag distance'),
+                        html.Br(),
+                        html.Span('Use the one of the functions below, or click on the graph to set a maximum lag.')
+                    ]),
+                    dcc.RadioItems(
+                        id='maxlag-method-select',
+                        options=[
+                            {'label': 'No MaxLag', 'value': 'none'},
+                            {'label': 'median', 'value': 'median'},
+                            {'label': 'mean', 'value': 'mean'},
+                            {'label': 'Use the Graph', 'value': 'graph'},
+                        ],
+                        value='none'
+                    ),
+                    dcc.Store(id='maxlag')
+                ])
             ]),
-            dcc.RadioItems(
-                id='maxlag-method-select',
-                options=[
-                    {'label': 'No MaxLag', 'value': 'none'},
-                    {'label': 'median', 'value': 'median'},
-                    {'label': 'mean', 'value': 'mean'},
-                    {'label': 'Use the Graph', 'value': 'graph'},
-                ],
-                value='none'
-            ),
-            dcc.Store(id='maxlag')
         ]),
         dbc.Col([
             html.P([
@@ -120,22 +130,31 @@ inputsForm = [
 
 ]
 
-main_graph = dcc.Loading(
-    id='main-graph-loader',
-    children=[dcc.Graph(id='variogram-graph')],
-    type='graph'
-)
+main_graph = dbc.Row([
+    dbc.Col([
+        dcc.Loading(
+            id='main-graph-loader',
+            children=[dcc.Graph(id='variogram-graph')],
+            type='graph'
+        )
+    ], width=12, lg=9),
+    dbc.Col([html.Pre([html.Code(id='variogram-description')])], width=12, lg=3)
+])
 
 outputs = [
     html.H3('More Results'),
     html.P('Inspect your results, they are instantly updated'),
     # Graph
     dbc.Row([
-        dbc.Col([
-            html.Pre([html.Code(id='variogram-description')])
-        ]),
-        dbc.Col([dcc.Loading(dcc.Graph(id='variogram-scattergram'), type='graph')]),
-        dbc.Col([dcc.Loading(dcc.Graph(id='distance-difference'), type='graph')])
+        dbc.Col(
+            [dcc.Loading(dcc.Graph(id='variogram-scattergram'), type='graph')],
+            width=12, lg=4
+        ),
+        dbc.Col(
+            [dcc.Loading(dcc.Graph(id='distance-difference'), type='graph')],
+            width=12, lg=4
+        ),
+        dbc.Col([], width=12, lg=4)
     ])
 ]
 
@@ -233,7 +252,16 @@ def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxla
     desc = json.dumps(V.describe(), indent=4)
 
     # update the layout
-    fig.update_layout(template='plotly_white')
+    fig.update_layout(
+        template='plotly_white',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1
+        )
+    )
     scat.update_layout(template='plotly_white')
     diff.update_layout(template='plotly_white')
     
