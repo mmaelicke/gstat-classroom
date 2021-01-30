@@ -2,6 +2,7 @@ import numpy as np
 import json
 
 import dash
+from dash.exceptions import PreventUpdate
 import dash_core_components as dcc 
 import dash_html_components as html 
 import dash_bootstrap_components as dbc 
@@ -41,6 +42,12 @@ ESTIMATORS = {
 # build the dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
+# dataset selector
+dataset_select = html.Div([
+    html.H3('Select your dataset'),
+    dcc.Dropdown(id='data-select', options=[{'label': 'Random Dummy data', 'value': 'rand'}])
+])
+
 # build the input mask
 inputsForm = [
     html.H3('Settings'),
@@ -63,63 +70,175 @@ inputsForm = [
                 value='matheron'
             )
         ], width=6)
+    ]),
+
+    # LAG AND BINNING SETTINGS
+    html.H5('Lag binning'),
+    dbc.Row([
+        dbc.Col([
+            html.P('Binning function:'),
+            dcc.RadioItems(
+                id='bin-function',
+                options=[
+                    {'label': 'Evenly spaced edges', 'value': 'even'},
+                    {'label': 'Uniform bin sizes', 'value': 'uniform'}
+                ],
+                value='even'
+            ),
+            html.P([
+                html.Strong('Maximum lag distance'),
+                html.Br(),
+                html.Span('Use the one of the functions below, or click on the graph to set a maximum lag.')
+            ]),
+            dcc.RadioItems(
+                id='maxlag-method-select',
+                options=[
+                    {'label': 'No MaxLag', 'value': 'none'},
+                    {'label': 'median', 'value': 'median'},
+                    {'label': 'mean', 'value': 'mean'},
+                    {'label': 'Use the Graph', 'value': 'graph'},
+                ],
+                value='none'
+            ),
+            dcc.Store(id='maxlag')
+        ]),
+        dbc.Col([
+            html.P([
+                'Number of lag bins:',
+                html.Span(id='n-lags-output', children=['10'])
+            ]),
+            dcc.Slider(
+                id='n-lags',
+                min=3,
+                max=100,
+                step=1,
+                value=10
+            )
+
+        ])
     ])
+
 ]
 
+main_graph = dcc.Loading(
+    id='main-graph-loader',
+    children=[dcc.Graph(id='variogram-graph')],
+    type='graph'
+)
+
 outputs = [
-    html.H3('Results'),
+    html.H3('More Results'),
     html.P('Inspect your results, they are instantly updated'),
     # Graph
-    dbc.Row([
-        dbc.Col([dcc.Graph(id='variogram-graph')])
-    ]),
     dbc.Row([
         dbc.Col([
             html.Pre([html.Code(id='variogram-description')])
         ]),
-        dbc.Col([
-            dcc.Graph(id='variogram-scattergram')
-        ]),
-        dbc.Col([])
+        dbc.Col([dcc.Loading(dcc.Graph(id='variogram-scattergram'), type='graph')]),
+        dbc.Col([dcc.Loading(dcc.Graph(id='distance-difference'), type='graph')])
     ])
 ]
 
-# build the layout
+# MAIN APP LAYOUT
 app.layout = html.Div([
+    dcc.Store(id='data-store'),
     # HEADER
-    html.H1('Variography', style={'text-align': 'center'}),
+     html.H1('Variography', style={'text-align': 'center'}),
+
+     # dataset selector
+     dataset_select,
     
-    dbc.Row([
-        dbc.Col(inputsForm, width=12, md=6, lg=4),
-        dbc.Col(outputs, width=12, md=6, lg=8)
-    ])
+     # Main graph
+     main_graph,
+     
+     # additional stuff
+    html.Div(inputsForm), html.Div(outputs)
 ])
+
+# CALLBACKS
+@app.callback(
+    Output('data-store', 'data'),
+    Input('data-select', 'value')
+)
+def load_data(dataset_name):
+    if dataset_name == 'rand':
+        return {
+            'coordinates': coords,
+            'values': values
+        }
+    return None
+
+
+@app.callback(
+    Output('maxlag', 'data'),
+    Input('maxlag-method-select', 'value'),
+    Input('variogram-graph', 'clickData')
+)
+def update_maxlag_value(method_select, clickData):
+    if method_select == 'graph' and clickData is not None:
+        return clickData.get('points', [{}])[0].get('x')
+    elif method_select in ['median', 'mean']:
+        return method_select
+    else:
+        return None
+
+@app.callback(
+    Output('n-lags-output', 'children'),
+    Input('n-lags', 'value')
+)
+def update_n_lags_output(n_lags):
+    return str(n_lags)
 
 
 @app.callback(
     Output('variogram-graph', 'figure'),
-    Output('variogram-scattergram', 'figure'),
     Output('variogram-description', 'children'),
+    Output('variogram-scattergram', 'figure'),
+    Output('distance-difference', 'figure'),
+    Input('data-store', 'data'),
     Input('select-model', 'value'),
-    Input('select-estimator', 'value')
+    Input('select-estimator', 'value'),
+    Input('bin-function', 'value'),
+    Input('n-lags', 'value'),
+    Input('maxlag', 'data')
 )
-def estimate_variogram(model_name, estimator_name):
+def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxlag):
+    # if there is no data selected, prevent update
+    if data is None:
+        raise PreventUpdate
+
+    # get the data
+    c = data.get('coordinates')
+    v = data.get('values')
+    
     # estimate the variogram
-    V = Variogram(coords, values, model=model_name, estimator=estimator_name) 
+    V = Variogram(c, v, 
+        model=model_name,
+        estimator=estimator_name,
+        bin_func=bin_func,
+        n_lags=n_lags,
+        maxlag=maxlag
+    ) 
 
     # core plot
-    fig = V.plot(show=False)
-    desc = json.dumps(V.describe(), indent=4)
-
+    fig = V.plot(show=False) 
+    
     # scattergram
     scat = V.scattergram(show=False)
+
+    # distance difference plot
+    diff = V.distance_difference_plot(show=False)
+
+    # description
+    desc = json.dumps(V.describe(), indent=4)
 
     # update the layout
     fig.update_layout(template='plotly_white')
     scat.update_layout(template='plotly_white')
+    diff.update_layout(template='plotly_white')
     
 
-    return fig, scat, desc
+    return fig, desc, scat, diff
 
 
 if __name__=='__main__':
