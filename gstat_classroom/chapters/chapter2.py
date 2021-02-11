@@ -1,54 +1,35 @@
-import numpy as np
 import json
-
-import dash
+from dash.dependencies import Input, Output
 from dash.exceptions import PreventUpdate
-import dash_core_components as dcc 
 import dash_html_components as html 
-import dash_bootstrap_components as dbc 
-from dash.dependencies import Input, Output 
-
+import dash_core_components as dcc 
+import dash_bootstrap_components as dbc
 from skgstat import plotting
-from skgstat import Variogram 
+from skgstat import Variogram
 
-# set plotly as plotting backend
+from gstat_classroom.app import app
+
+from gstat_classroom import settings
+from gstat_classroom import datasets
+from gstat_classroom import components
+
+# Set plotly as plotting backend
 plotting.backend('plotly')
 
-## DEV dummy data
-np.random.seed(42)
-coords = np.random.gamma(14, 6, size=(150, 2))
-np.random.seed(42)
-values = np.random.gamma(150, 2, size=(150))
-
-
-# settings
-MODELS = {
-    'spherical': 'Spherical',
-    'exponential': 'Exponential',
-    'gaussian': 'Gaussian',
-    'matern': 'Matérn',
-    'cubic': 'Cubic Model',
-    'stable': 'Stable model'
-}
-ESTIMATORS = {
-    'matheron': 'Matheron',
-    'cressie': 'Cressie-Hawkins',
-    'dowd': 'Dowd',
-    'genton': 'Genton',
-    'entropy': 'Shannon Entropy',
-    'minmax': 'MinMax (experimental)'
-}
-
-# build the dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-
-# dataset selector
-dataset_select = html.Div([
-    html.H3('Select your dataset'),
-    dcc.Dropdown(id='data-select', options=[{'label': 'Random Dummy data', 'value': 'rand'}])
+# ----------------------------------------------
+#                   LAYOUT
+# ----------------------------------------------
+# Headline Jumbotron
+header = dbc.Jumbotron([
+    dbc.Container([
+        html.H1('Variography', className='display-3'),
+        html.P("This Chapter is about the core class of scikit-gstat. More description bla bla ...", className="my-3"),
+        html.Hr(className='my-3'),
+        components.dataset_select
+    ])
 ])
 
-# build the input mask
+# INPUT FORM
 inputsForm = [
     html.H3('Settings'),
     html.P('Specify the variogram settings below and instantly see the effect on the results'),
@@ -58,7 +39,7 @@ inputsForm = [
             html.H5('Variogram Model'),
             dcc.Dropdown(
                 id='select-model',
-                options=[{'label': v, 'value': k} for k,v in MODELS.items()],
+                options=[{'label': v, 'value': k} for k,v in settings.MODELS.items()],
                 value='spherical'
             ),
         ], width=6),
@@ -66,14 +47,14 @@ inputsForm = [
             html.H5('Variogram Estimator'),
             dcc.Dropdown(
                 id='select-estimator',
-                options=[{'label': v, 'value': k} for k,v in ESTIMATORS.items()],
+                options=[{'label': v, 'value': k} for k,v in settings.ESTIMATORS.items()],
                 value='matheron'
             )
         ], width=6)
-    ]),
+    ], className='my-3'),
 
     # LAG AND BINNING SETTINGS
-    html.H5('Lag binning'),
+    html.H5('Lag binning', className='my-1'),
     dbc.Row([
         dbc.Col([
             dbc.Row([
@@ -126,10 +107,10 @@ inputsForm = [
             )
 
         ])
-    ])
-
+    ], className='my-3')
 ]
 
+# MAIN GRAPH
 main_graph = dbc.Row([
     dbc.Col([
         dcc.Loading(
@@ -138,10 +119,25 @@ main_graph = dbc.Row([
             type='graph'
         )
     ], width=12, lg=9),
-    dbc.Col([html.Pre([html.Code(id='variogram-description')])], width=12, lg=3)
+    dbc.Col(
+        children=[
+            html.H3([
+                html.Code('describe()'),
+                html.Span(' output')
+            ], className='my-3'),
+            html.Pre(
+                children=[html.Code(id='variogram-description')],
+                className='p-1',
+                style=dict(backgroundColor='#E9ECEF')
+            )
+        ],
+        width=12,
+        lg=3
+    )
 ])
 
-outputs = [
+# OUPUT ROW
+output_row = [
     html.H3('More Results'),
     html.P('Inspect your results, they are instantly updated'),
     # Graph
@@ -154,40 +150,38 @@ outputs = [
             [dcc.Loading(dcc.Graph(id='distance-difference'), type='graph')],
             width=12, lg=4
         ),
-        dbc.Col([], width=12, lg=4)
+        dbc.Col(
+            [dcc.Loading(dcc.Graph(id='location-trend'), type='graph')],
+            width=12, lg=4)
     ])
 ]
 
-# MAIN APP LAYOUT
-app.layout = html.Div([
-    dcc.Store(id='data-store'),
-    # HEADER
-     html.H1('Variography', style={'text-align': 'center'}),
+LAYOUT = html.Div([
+    # HEADLINE
+    header,
 
-     # dataset selector
-     dataset_select,
-    
-     # Main graph
-     main_graph,
-     
-     # additional stuff
-    html.Div(inputsForm), html.Div(outputs)
+    # Main graph
+    main_graph,
+
+    # inputForm 
+    dbc.Container(
+        children=inputsForm, 
+        fluid=True, 
+        style=dict(backgroundColor='#E9ECEF'),
+        className='p-5'
+    ),
+
+    # additional output row
+    html.Div(
+        children=output_row,
+        className='p-5'
+    )
 ])
 
-# CALLBACKS
-@app.callback(
-    Output('data-store', 'data'),
-    Input('data-select', 'value')
-)
-def load_data(dataset_name):
-    if dataset_name == 'rand':
-        return {
-            'coordinates': coords,
-            'values': values
-        }
-    return None
 
-
+# ----------------------------------------------
+#              Append Callbacks
+# ----------------------------------------------
 @app.callback(
     Output('maxlag', 'data'),
     Input('maxlag-method-select', 'value'),
@@ -214,6 +208,7 @@ def update_n_lags_output(n_lags):
     Output('variogram-description', 'children'),
     Output('variogram-scattergram', 'figure'),
     Output('distance-difference', 'figure'),
+    Output('location-trend', 'figure'),
     Input('data-store', 'data'),
     Input('select-model', 'value'),
     Input('select-estimator', 'value'),
@@ -248,6 +243,9 @@ def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxla
     # distance difference plot
     diff = V.distance_difference_plot(show=False)
 
+    # location trend plot
+    trend = V.location_trend(show=False)
+
     # description
     desc = json.dumps(V.describe(), indent=4)
 
@@ -264,10 +262,7 @@ def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxla
     )
     scat.update_layout(template='plotly_white')
     diff.update_layout(template='plotly_white')
+    trend.update_layout(template='plotly_white')
     
 
-    return fig, desc, scat, diff
-
-
-if __name__=='__main__':
-    app.run_server(debug=True)
+    return fig, desc, scat, diff, trend
