@@ -1,6 +1,11 @@
 from setuptools import setup, find_packages
 
 
+def version():
+    with open('gstat_classroom/VERSION') as f:
+        return f.read().strip()
+
+
 def readme():
     with open('README.md') as f:
         return f.read().strip()
@@ -17,4 +22,5 @@ setup(
     author_email='mirko.maelicke@kit.edu',
     license='MIT License',
     install_requires=requirements(),
+    version=version()
 )

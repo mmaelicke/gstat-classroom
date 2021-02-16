@@ -2,19 +2,13 @@ import dash_html_components as html
 import dash_core_components as dcc 
 from dash.dependencies import Input, Output
 
-from gstat_classroom import settings
 from gstat_classroom import datasets
 from gstat_classroom.app import app
 
-__options = [{'label': k, 'value': v} for k,v in settings.DATASETS.items()]
-
-# create the actual datasets
-DATA = dict(
-    rand=datasets.create_random_3d()
-)
+__options = [{'label': v, 'value': k} for k,v in datasets.DATASETS.items()]
 
 LAYOUT = html.Div([
-    html.H3('Select you dataset'),
+    html.H3('Select your dataset'),
     dcc.Dropdown(
         id='data-select',
         options=__options
@@ -26,4 +20,4 @@ LAYOUT = html.Div([
     Input('data-select', 'value')
 )
 def load_data(dataset_name):
-    return DATA.get(dataset_name, None)
+    return dataset_name

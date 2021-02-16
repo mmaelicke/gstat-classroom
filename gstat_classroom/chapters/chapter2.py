@@ -16,6 +16,9 @@ from gstat_classroom import components
 # Set plotly as plotting backend
 plotting.backend('plotly')
 
+# some dev tests
+CURRENT = dict(variogram=None)
+
 # ----------------------------------------------
 #                   LAYOUT
 # ----------------------------------------------
@@ -216,11 +219,13 @@ def update_n_lags_output(n_lags):
     Input('n-lags', 'value'),
     Input('maxlag', 'data')
 )
-def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxlag):
+def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, maxlag):
     # if there is no data selected, prevent update
-    if data is None:
+    if data_name is None: 
         raise PreventUpdate
-
+    
+    # get the dataset
+    data = datasets.DATA.get(data_name)
     # get the data
     c = data.get('coordinates')
     v = data.get('values')
@@ -234,6 +239,9 @@ def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxla
         maxlag=maxlag
     ) 
 
+    # development test
+    CURRENT['variogram'] = V
+
     # core plot
     fig = V.plot(show=False) 
     
@@ -244,7 +252,7 @@ def estimate_variogram(data, model_name, estimator_name, bin_func, n_lags, maxla
     diff = V.distance_difference_plot(show=False)
 
     # location trend plot
-    trend = V.location_trend(show=False)
+    trend = V.location_trend(show=False, add_trend_line=True)
 
     # description
     desc = json.dumps(V.describe(), indent=4)

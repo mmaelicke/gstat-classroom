@@ -1,8 +1,4 @@
 # settings
-DATASETS = {
-    'Random dummy 3D data': 'rand'
-}
-
 MODELS = {
     'spherical': 'Spherical',
     'exponential': 'Exponential',
