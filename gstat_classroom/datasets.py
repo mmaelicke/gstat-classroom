@@ -5,6 +5,8 @@ import numpy as np
 from imageio import imread
 import base64
 import hashlib
+from datetime import datetime as dt
+from datetime import timedelta as td
 
 DATAPATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
 
@@ -43,21 +45,70 @@ def pancake(fname='pancake1.png', seed=None, n=600) -> dict:
     )
 
 
-# TODO: This can be replaced by an instance of a class managing the data
-# i.e. caching the hashs into a in-memory sqlite database
-# for now, this stays static
-def __create_dataset(func, *args, **kwargs):
-    # run the dataset creator
-    result_dict = func(*args, **kwargs)
+class DataManager:
+    CREATORS = [create_random_3d, pancake]
+    DATA = {}
+    DATANAMES = {}
+    VARIOGRAM = {}
 
-    # hash the result
-    h = hashlib.sha256(str(result_dict).encode()).hexdigest()
+    def __init__(self, seed=42):
+        self.DATA = {k: v for k,v in [self.__create_dataset(create_func, seed=seed) for create_func in self.CREATORS]}
+        self.DATANAMES = {k:func.__doc__.split('\n')[0] for k, func in [(h, f) for h,f in zip(self.DATA.keys(), self.CREATORS)]}
 
-    return h, result_dict
+    def get_names(self) -> dict:
+        return self.DATANAMES
 
+    def get_data(self, name) -> dict:
+        return self.DATA.get(name)
+    
+    def get_variogram(self, name) -> dict:
+        return self.VARIOGRAM.get(name)
 
-CREATORS = [create_random_3d, pancake]
+    def add_data(self, name=None, **kwargs):
+        h, result_dict = self.__create_dataset(**kwargs)
 
-DATA = {k: v for k,v in [__create_dataset(create_func, seed=42) for create_func in CREATORS]}
+        # set the new data
+        self.DATA[h] = result_dict
 
-DATASETS = {k:func.__doc__.split('\n')[0] for k, func in [(h, f) for h,f in zip(DATA.keys(), CREATORS)]}
+        if name is None:
+            name = f'Custom dataset added {dt.utcnow()}'
+        self.DATANAMES[h] = name
+
+    def add_variogram(self, variogram):
+        # remove variograms which are too old
+        self._check_old_variogram()
+        
+        # build the needed hash
+        d = dict(c=variogram.coordinates, v=variogram.values, p=variogram.describe(flat=True))
+        h = hashlib.sha256(str(d).encode()).hexdigest()
+
+        # store the variogram
+        self.VARIOGRAM[h] = dict(dtime=dt.utcnow(), v=variogram.clone())
+
+        return h
+
+    def remove_variogram(self, h):
+        if h in self.VARIOGRAM.keys():
+            del self.VARIOGRAM[h]
+
+    def _check_old_variogram(self, since_hours=2):
+        # create the timestamp
+        since = dt.utcnow() - td(hours=since_hours)
+        
+        # remove everything older than since
+        for h, data in self.VARIOGRAM.items():
+            dtime = data['dtime']
+            if dtime < since:
+                self.remove_variogram(h)
+
+    def __create_dataset(self, func, *args, **kwargs):
+        # run the dataset creator
+        result_dict = func(*args, **kwargs)
+
+        # hash the result
+        h = hashlib.sha256(str(result_dict).encode()).hexdigest()
+
+        return h, result_dict
+
+# instantiate a DataManager
+DATAMANAGER = DataManager()

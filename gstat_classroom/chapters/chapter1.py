@@ -4,5 +4,5 @@ from gstat_classroom.app import app
 
 
 LAYOUT = html.Div([
-    html.H1('CHAPTER TWO')
+    html.H1('CHAPTER ONE')
 ])

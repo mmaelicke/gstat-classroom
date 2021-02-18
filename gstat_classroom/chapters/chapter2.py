@@ -10,14 +10,11 @@ from skgstat import Variogram
 from gstat_classroom.app import app
 
 from gstat_classroom import settings
-from gstat_classroom import datasets
+from gstat_classroom.datasets import DATAMANAGER
 from gstat_classroom import components
 
 # Set plotly as plotting backend
 plotting.backend('plotly')
-
-# some dev tests
-CURRENT = dict(variogram=None)
 
 # ----------------------------------------------
 #                   LAYOUT
@@ -114,30 +111,22 @@ inputsForm = [
 ]
 
 # MAIN GRAPH
-main_graph = dbc.Row([
-    dbc.Col([
-        dcc.Loading(
-            id='main-graph-loader',
-            children=[dcc.Graph(id='variogram-graph')],
-            type='graph'
+main_graph = dbc.Row(
+    children=[
+        dbc.Col(
+            children=components.variogram_plot,
+            width=12,
+            lg=9
+        ),
+        dbc.Col(
+            children=components.variogram_description,
+            width=12,
+            lg=3
         )
-    ], width=12, lg=9),
-    dbc.Col(
-        children=[
-            html.H3([
-                html.Code('describe()'),
-                html.Span(' output')
-            ], className='my-3'),
-            html.Pre(
-                children=[html.Code(id='variogram-description')],
-                className='p-1',
-                style=dict(backgroundColor='#E9ECEF')
-            )
-        ],
-        width=12,
-        lg=3
-    )
-])
+    ],
+    className="m-0 p-3",
+    style=dict(boxSizing='border-box')
+)
 
 # OUPUT ROW
 output_row = [
@@ -188,7 +177,7 @@ LAYOUT = html.Div([
 @app.callback(
     Output('maxlag', 'data'),
     Input('maxlag-method-select', 'value'),
-    Input('variogram-graph', 'clickData')
+    Input('variogram-plot', 'clickData')
 )
 def update_maxlag_value(method_select, clickData):
     if method_select == 'graph' and clickData is not None:
@@ -196,7 +185,7 @@ def update_maxlag_value(method_select, clickData):
     elif method_select in ['median', 'mean']:
         return method_select
     else:
-        return None
+        raise PreventUpdate 
 
 @app.callback(
     Output('n-lags-output', 'children'),
@@ -207,11 +196,10 @@ def update_n_lags_output(n_lags):
 
 
 @app.callback(
-    Output('variogram-graph', 'figure'),
-    Output('variogram-description', 'children'),
     Output('variogram-scattergram', 'figure'),
     Output('distance-difference', 'figure'),
     Output('location-trend', 'figure'),
+    Output('current-variogram-id', 'data'),
     Input('data-store', 'data'),
     Input('select-model', 'value'),
     Input('select-estimator', 'value'),
@@ -225,7 +213,8 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
         raise PreventUpdate
     
     # get the dataset
-    data = datasets.DATA.get(data_name)
+    data = DATAMANAGER.get_data(data_name)
+
     # get the data
     c = data.get('coordinates')
     v = data.get('values')
@@ -240,10 +229,7 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
     ) 
 
     # development test
-    CURRENT['variogram'] = V
-
-    # core plot
-    fig = V.plot(show=False) 
+    current_variogram = DATAMANAGER.add_variogram(V)
     
     # scattergram
     scat = V.scattergram(show=False)
@@ -254,23 +240,10 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
     # location trend plot
     trend = V.location_trend(show=False, add_trend_line=True)
 
-    # description
-    desc = json.dumps(V.describe(), indent=4)
-
     # update the layout
-    fig.update_layout(
-        template='plotly_white',
-        legend=dict(
-            orientation='h',
-            yanchor='bottom',
-            y=1.02,
-            xanchor='right',
-            x=1
-        )
-    )
     scat.update_layout(template='plotly_white')
     diff.update_layout(template='plotly_white')
     trend.update_layout(template='plotly_white')
     
 
-    return fig, desc, scat, diff, trend
+    return scat, diff, trend, current_variogram
