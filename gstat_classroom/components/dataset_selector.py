@@ -5,7 +5,6 @@ from dash.dependencies import Input, Output
 from gstat_classroom.datasets import DATAMANAGER
 from gstat_classroom.app import app
 
-# __options = [{'label': v, 'value': k} for k,v in datasets.DATASETS.items()]
 __options = [{'label': v, 'value': h} for h,v in DATAMANAGER.get_names().items()]
 
 LAYOUT = html.Div([

@@ -18,7 +18,8 @@ backend('plotly')
 # Component layout
 LAYOUT = html.Div([
     dcc.Loading(
-        dcc.Graph(id='variogram-plot'),
+        id='variogram-plot-loading',
+        children=dcc.Graph(id='variogram-plot'),
         type='graph'
     )
 ])

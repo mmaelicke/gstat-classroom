@@ -38,6 +38,7 @@ LAYOUT = dbc.Container(
         # Stores
         dcc.Store(id='data-store', storage_type='session'),
         dcc.Store(id='current-variogram-id', storage_type='session'),
+        dcc.Store(id='current-kriging-id', storage_type='session'),
 
         dcc.Location(id='url', refresh=False),
         navbar,

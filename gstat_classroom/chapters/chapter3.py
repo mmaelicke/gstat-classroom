@@ -1,9 +1,13 @@
 import json
+import numpy as np
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import dash_html_components as html
 import dash_bootstrap_components as dbc 
 import dash_core_components as dcc
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from gstat_classroom.app import app
 from gstat_classroom.datasets import DATAMANAGER
@@ -143,6 +147,20 @@ kriging_settings = html.Div([
     ])
 ])
 
+output_graph = dbc.Row([
+    dbc.Col(
+        children=[
+            html.H3('Kriging result'),
+            dcc.Loading(
+                id='kriging-plot-loading',
+                children=dcc.Graph(id='kriging-plot'), 
+                type='graph'
+            )
+        ],
+        width=12
+    ),
+])
+
 LAYOUT = html.Div([
     # page header
     header,
@@ -156,6 +174,12 @@ LAYOUT = html.Div([
         children=kriging_settings,
         fluid=True,
         style=dict(backgroundColor='#E9ECEF'),
+        className='p-5'
+    ),
+
+    dbc.Container(
+        children=output_graph,
+        fluid=True,
         className='p-5'
     ),
 
@@ -201,7 +225,8 @@ def update_grid_size_label(size):
 
 # MAIN Kriging application
 @app.callback(
-    Output('dummy', 'children'),
+    Output('current-kriging-id', 'data'),
+    Output('kriging-plot-loading', 'is_loading'),
     Input('start-button', 'n_clicks'),
     State('current-variogram-id', 'data'),
     State('grid-size', 'value'),
@@ -210,9 +235,11 @@ def update_grid_size_label(size):
 )
 def kriging(n_clicks, variogram_name, grid_size, points_range, mode):
     # get the current Variogram
-    tup = DATAMANAGER.get_variogram(variogram_name),
+    tup = DATAMANAGER.get_variogram(variogram_name)
     if tup is None:
         raise PreventUpdate
+    else:
+        V = tup['v']
 
     # parse the points
     min_points, max_points = points_range
@@ -225,4 +252,80 @@ def kriging(n_clicks, variogram_name, grid_size, points_range, mode):
         mode=mode
     )
 
-    return json.dumps(dummy, indent=4)
+    # build the grid
+    min_x = np.min(V.coordinates[:,0])
+    max_x = np.max(V.coordinates[:,0])
+    min_y = np.min(V.coordinates[:,1])
+    max_y = np.max(V.coordinates[:,1])
+    xx,yy = np.mgrid[min_x:max_x:grid_size*1j, min_y:max_y:grid_size*1j]
+
+    # instantiate the kriging algorithm
+    ok = OrdinaryKriging(
+        V,
+        min_points=min_points,
+        max_points=max_points,
+        mode=mode,
+        perf=True
+    )
+
+    # start interpolation
+    field = ok.transform(xx.flatten(), yy.flatten()).reshape(xx.shape)
+    sigma = ok.sigma.reshape(xx.shape)
+
+    # add the field to the datastore
+    field_hash = DATAMANAGER.add_kriging(field=field, sigma=sigma)
+
+    return field_hash, True
+
+
+@app.callback(
+    Output('kriging-plot', 'figure'),
+    Input('current-kriging-id', 'data')
+)
+def update_fields_figure(field_hash):
+    if field_hash is None:
+        raise PreventUpdate
+
+    data = DATAMANAGER.get_kriging(field_hash)
+    field = data['data']['field']
+    sigma = data['data'].get('sigma')
+
+    # create the figure
+    if sigma is not None:
+        fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'surface'}, {'type': 'surface'}]])
+    else:
+        fig = make_subplots(rows=1, cols=1, specs=[[{'type': 'surface'}]])
+
+    fig.add_trace(
+        go.Surface(z=field, colorscale='Earth_r'),
+        row=1, col=1
+    )
+
+    if sigma is not None:
+        fig.add_trace(
+            go.Surface(z=np.log(sigma), colorscale='thermal', showscale=False),
+            row=1, col=2
+        )
+
+    # set the scene
+    scene = dict(
+        aspectratio=dict(x=1, y=1, z=0.1),
+        camera=dict(eye=dict(x=.1, y=0., z=1.5))
+    )
+
+    # define the layout
+    layout = dict(
+        template='plotly_white',
+        margin=dict(t=0, b=0, l=15, r=15)
+    )
+
+    if sigma is None:
+        layout['scene'] = scene
+    else:
+        layout['scene1'] = scene
+        layout['scene2'] = scene
+
+    # update the figures
+    fig.update_layout(**layout)
+
+    return fig

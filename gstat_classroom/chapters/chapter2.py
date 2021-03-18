@@ -200,6 +200,7 @@ def update_n_lags_output(n_lags):
     Output('distance-difference', 'figure'),
     Output('location-trend', 'figure'),
     Output('current-variogram-id', 'data'),
+    Output('variogram-plot-loading', 'is_loading'),
     Input('data-store', 'data'),
     Input('select-model', 'value'),
     Input('select-estimator', 'value'),
@@ -246,4 +247,4 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
     trend.update_layout(template='plotly_white')
     
 
-    return scat, diff, trend, current_variogram
+    return scat, diff, trend, current_variogram, True

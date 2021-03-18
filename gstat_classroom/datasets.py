@@ -40,7 +40,6 @@ def pancake(fname='pancake1.png', seed=None, n=600) -> dict:
     return dict(
         coordinates=coords,
         values=vals,
-#        imgSrc=b64
         original2D=data
     )
 
@@ -50,6 +49,7 @@ class DataManager:
     DATA = {}
     DATANAMES = {}
     VARIOGRAM = {}
+    KRIGING = {}
 
     def __init__(self, seed=42):
         self.DATA = {k: v for k,v in [self.__create_dataset(create_func, seed=seed) for create_func in self.CREATORS]}
@@ -63,6 +63,9 @@ class DataManager:
     
     def get_variogram(self, name) -> dict:
         return self.VARIOGRAM.get(name)
+
+    def get_kriging(self, name) -> dict:
+        return self.KRIGING.get(name)
 
     def add_data(self, name=None, **kwargs):
         h, result_dict = self.__create_dataset(**kwargs)
@@ -87,9 +90,26 @@ class DataManager:
 
         return h
 
+    def add_kriging(self, field, sigma=None):
+        # remove krigings which are too old
+        self._check_old_kriging()
+
+        # build the needed hash
+        d = dict(field=field, sigma=sigma)
+        h = hashlib.sha256(str(d).encode()).hexdigest()
+
+        # store the field
+        self.KRIGING[h] = dict(dtime=dt.utcnow(), data=d)
+
+        return h
+
     def remove_variogram(self, h):
         if h in self.VARIOGRAM.keys():
             del self.VARIOGRAM[h]
+
+    def remove_kriging(self, h):
+        if h in self.KRIGING.keys():
+            del self.KRIGING[h]
 
     def _check_old_variogram(self, since_hours=2):
         # create the timestamp
@@ -100,6 +120,16 @@ class DataManager:
             dtime = data['dtime']
             if dtime < since:
                 self.remove_variogram(h)
+
+    def _check_old_kriging(self, since_hours=1):
+        # create the timestamp
+        since = dt.utcnow() - td(hours=since_hours)
+
+        # remove everything older than since
+        for h, data in self.KRIGING.items():
+            dtime = data['dtime']
+            if dtime < since:
+                self.remove_kriging(h)
 
     def __create_dataset(self, func, *args, **kwargs):
         # run the dataset creator
