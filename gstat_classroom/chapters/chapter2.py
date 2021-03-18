@@ -19,95 +19,135 @@ plotting.backend('plotly')
 # ----------------------------------------------
 #                   LAYOUT
 # ----------------------------------------------
+MY = 'my-3'
 # Headline Jumbotron
 header = dbc.Jumbotron([
     dbc.Container([
         html.H1('Variography', className='display-3'),
-        html.P("This Chapter is about the core class of scikit-gstat. More description bla bla ...", className="my-3"),
-        html.Hr(className='my-3'),
+        html.P("This Chapter is about the core class of scikit-gstat. More description bla bla ...", className=MY),
+        html.Hr(className=MY),
         components.dataset_select
     ])
 ])
 
+# MODEL AND ESTIMATOR
+#--------------------
+model_estimator = dbc.Row([
+    dbc.Col([
+        html.H5('Variogram Model'),
+        dcc.Dropdown(
+            id='select-model',
+            options=[{'label': v, 'value': k} for k,v in settings.MODELS.items()],
+            value='spherical'
+        ),
+    ], xs=12, md=6),
+    dbc.Col([
+        html.H5('Variogram Estimator'),
+        dcc.Dropdown(
+            id='select-estimator',
+            options=[{'label': v, 'value': k} for k,v in settings.ESTIMATORS.items()],
+            value='matheron'
+        )
+    ], xs=12, md=6)
+], className=MY)
+
+# Binning 
+# -------
+binning = dbc.Row([
+    dbc.Col([
+        html.P('Binning function'),
+        dcc.Dropdown(
+            id='bin-function',
+            options=[{'label': v, 'value': k} for k,v in settings.BINNING.items()],
+            value='even'
+        )
+
+    ], xs=12, md=6),
+    dbc.Col([
+        html.P([
+            'Number of lag bins:',
+            html.Span(id='n-lags-output', children=['10'])
+        ]),
+        dcc.Slider(
+            id='n-lags',
+            min=3,
+            max=100,
+            step=1,
+            value=10
+        )
+    ], xs=12, md=6)
+], className=MY)
+
+# Fitting
+#--------
+fitting = dbc.Row([
+    dbc.Col([
+        html.P('Fitting function'),
+        dcc.Dropdown(
+            id='fit-function',
+            options=[{'label': v, 'value': k} for k,v in settings.FITTING.items()],
+            value='trf'
+        )
+
+    ], xs=12, md=6),
+    dbc.Col([
+        html.P('Fitting weights'),
+        dcc.Dropdown(
+            id='fit-sigma',
+            options=[{'label': v, 'value': k} for k,v in settings.FITTING_WEIGHTS.items()],
+            value='none'
+        )
+    ], xs=12, md=6)
+], className=MY)
+
+# Maxlag settings
+#----------------
+maxlag_setter = dbc.Row([
+    dbc.Col([], xs=12, md=4),
+    dbc.Col([], xs=12, md=4),
+    dbc.Col([
+        html.P([
+            html.Strong('Maximum lag distance'),
+            html.Br(),
+            html.Span('Use the one of the functions below, or click on the graph to set a maximum lag.')
+        ]),
+        dcc.RadioItems(
+            id='maxlag-method-select',
+            options=[
+                {'label': 'No MaxLag', 'value': 'none'},
+                {'label': 'median', 'value': 'median'},
+                {'label': 'mean', 'value': 'mean'},
+                {'label': 'Use the Graph', 'value': 'graph'},
+            ],
+            value='none'
+        ),
+        dcc.Store(id='maxlag')
+    ], xs=12, md=4)
+], className=MY)
+
 # INPUT FORM
+#-----------
 inputsForm = [
     html.H3('Settings'),
     html.P('Specify the variogram settings below and instantly see the effect on the results'),
+    
     # MODEL and ESTIMATOR
-    dbc.Row([
-        dbc.Col([
-            html.H5('Variogram Model'),
-            dcc.Dropdown(
-                id='select-model',
-                options=[{'label': v, 'value': k} for k,v in settings.MODELS.items()],
-                value='spherical'
-            ),
-        ], width=6),
-        dbc.Col([
-            html.H5('Variogram Estimator'),
-            dcc.Dropdown(
-                id='select-estimator',
-                options=[{'label': v, 'value': k} for k,v in settings.ESTIMATORS.items()],
-                value='matheron'
-            )
-        ], width=6)
-    ], className='my-3'),
+    model_estimator,
 
     # LAG AND BINNING SETTINGS
-    html.H5('Lag binning', className='my-1'),
-    dbc.Row([
-        dbc.Col([
-            dbc.Row([
-                dbc.Col([
-                    html.P([
-                        html.Strong('Binning function'),
-                        html.Br(),
-                        html.Span('There are multiple options how the Variogram can automatically lag bin edges')
-                    ]),
-                    dcc.RadioItems(
-                        id='bin-function',
-                        options=[
-                            {'label': 'Evenly spaced edges', 'value': 'even'},
-                            {'label': 'Uniform bin sizes', 'value': 'uniform'}
-                        ],
-                        value='even'
-                    ),
-                ]),
-                dbc.Col([
-                    html.P([
-                        html.Strong('Maximum lag distance'),
-                        html.Br(),
-                        html.Span('Use the one of the functions below, or click on the graph to set a maximum lag.')
-                    ]),
-                    dcc.RadioItems(
-                        id='maxlag-method-select',
-                        options=[
-                            {'label': 'No MaxLag', 'value': 'none'},
-                            {'label': 'median', 'value': 'median'},
-                            {'label': 'mean', 'value': 'mean'},
-                            {'label': 'Use the Graph', 'value': 'graph'},
-                        ],
-                        value='none'
-                    ),
-                    dcc.Store(id='maxlag')
-                ])
-            ]),
-        ]),
-        dbc.Col([
-            html.P([
-                'Number of lag bins:',
-                html.Span(id='n-lags-output', children=['10'])
-            ]),
-            dcc.Slider(
-                id='n-lags',
-                min=3,
-                max=100,
-                step=1,
-                value=10
-            )
+    html.H5('Lag binning', className='mt-5'),
+    binning,
 
-        ])
-    ], className='my-3')
+    # Fitting
+    html.H5('Model fitting', className='mt-5'),
+    fitting,
+    
+    # maxlag
+    html.Div([], className='mt-5'),
+    maxlag_setter,
+    dbc.Container([
+        dbc.Button('Done? Apply Kriging here...', size='lg', block=True, color='secondary', outline=True, href='/chapter3')
+    ], className='mt-3 p-5')
 ]
 
 # MAIN GRAPH
@@ -196,6 +236,13 @@ def update_n_lags_output(n_lags):
 
 
 @app.callback(
+    Output('n-lags', 'disabled'),
+    Input('bin-function', 'value')
+)
+def disable_slider(func_name):
+    return func_name in ['sturges', 'scott', 'fd', 'sqrt', 'doane']
+
+@app.callback(
     Output('variogram-scattergram', 'figure'),
     Output('distance-difference', 'figure'),
     Output('location-trend', 'figure'),
@@ -206,9 +253,11 @@ def update_n_lags_output(n_lags):
     Input('select-estimator', 'value'),
     Input('bin-function', 'value'),
     Input('n-lags', 'value'),
+    Input('fit-function', 'value'),
+    Input('fit-sigma', 'value'),
     Input('maxlag', 'data')
 )
-def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, maxlag):
+def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, fit_func, fit_sigma, maxlag):
     # if there is no data selected, prevent update
     if data_name is None: 
         raise PreventUpdate
@@ -219,12 +268,18 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
     # get the data
     c = data.get('coordinates')
     v = data.get('values')
+
+    # fit_sigma string 'none' has to be converted to Python None
+    if fit_sigma == 'none':
+        fit_sigma = None
     
     # estimate the variogram
     V = Variogram(c, v, 
         model=model_name,
         estimator=estimator_name,
         bin_func=bin_func,
+        fit_method=fit_func,
+        fit_sigma=fit_sigma,
         n_lags=n_lags,
         maxlag=maxlag
     ) 

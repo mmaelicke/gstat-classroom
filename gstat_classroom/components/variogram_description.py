@@ -3,6 +3,7 @@ Component to print the current `Variogram.describe`
 
 """
 import json
+import numpy as np
 from dash.dependencies import Input, Output
 import dash_html_components as html 
 import dash_bootstrap_components as dbc
@@ -43,4 +44,18 @@ def update_variogram_description(variogram_name):
     
     # extract and return
     V = tup['v']
-    return json.dumps(V.describe(flat=True), indent=4)
+    desc = V.describe(flat=True)
+
+    # turn any numpy array to a list and round floats
+    for key, value in desc.items():
+        if isinstance(value, np.ndarray):
+            desc[key] = [np.round(v, 2) for v in value]
+        if isinstance(value, (float, np.float64)):
+            if value > 1:
+                desc[key] = np.round(value, decimals=2)
+            elif value > 10:
+                desc[key] = np.round(value, decimals=1)
+            else:
+                desc[key] = np.round(value, decimals=4)
+    
+    return json.dumps(desc, indent=4)

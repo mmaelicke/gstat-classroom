@@ -7,7 +7,7 @@ from gstat_classroom.app import app
 from gstat_classroom.chapters import home, chapter1, chapter2, chapter3
 
 # create the application-wide navbar
-navbar = dbc.NavbarSimple(
+navbar_simple = dbc.NavbarSimple(
     children=[
         dbc.NavLink('Home', href='/'),
         dbc.DropdownMenu(
@@ -30,6 +30,46 @@ navbar = dbc.NavbarSimple(
     dark=True,
     fluid=True,
     className='px-5'
+)
+
+navbar = dbc.Navbar(
+    children=[
+        html.Div([
+            html.A([
+                html.Img(src="/assets/logo.png", height="56px")
+            ], href="https://hydrocode.de", target="_blank"),
+            html.A([
+                dbc.NavbarBrand("SciKit-GStat")
+            ], 
+            href="https://mmaelicke.github.com/scikit-gstat",
+            target="_blank",
+            className="ml-3")
+        ]),
+        dbc.Nav(
+            children=[
+                dbc.NavLink('Home', href='/'),
+                dbc.DropdownMenu(
+                    children=[
+                        dbc.DropdownMenuItem('All chapters', header=True),
+                        dbc.DropdownMenuItem('Chapter 1 - Datasets', href='/chapter1'),
+                        dbc.DropdownMenuItem('Chapter 2 - Variography', href='/chapter2'),
+                        dbc.DropdownMenuItem('Chapter 3 - Kriging', href='/chapter3')
+                    ],
+                    nav=True,
+                    in_navbar=True,
+                    direction='bottom',
+                    right=True,
+                    label='Chapters',
+                    className='mr-5'
+                )
+            ],
+            navbar=True
+        )
+    ],
+    dark=True,
+    color='dark',
+    className='px-5',
+    style=dict(justifyContent='space-between')
 )
 
 # app layout

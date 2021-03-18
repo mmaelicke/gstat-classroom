@@ -16,13 +16,15 @@ backend('plotly')
 
 
 # Component layout
-LAYOUT = html.Div([
-    dcc.Loading(
-        id='variogram-plot-loading',
-        children=dcc.Graph(id='variogram-plot'),
-        type='graph'
-    )
-])
+LAYOUT = html.Div(
+    children=[
+        dcc.Loading(
+            id='variogram-plot-loading',
+            children=dcc.Graph(id='variogram-plot'),
+            type='graph'
+        )
+    ]
+)
 
 
 # Component callbacks
@@ -44,6 +46,7 @@ def update_main_variogram_plot(variogram_name):
     # plot and update the layout
     fig = V.plot(show=False)
     fig.update_layout(
+        autosize=True,
         template='plotly_white',
         legend=dict(
             orientation='h',
