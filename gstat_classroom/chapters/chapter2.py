@@ -103,8 +103,23 @@ fitting = dbc.Row([
 # Maxlag settings
 #----------------
 maxlag_setter = dbc.Row([
-    dbc.Col([], xs=12, md=4),
-    dbc.Col([], xs=12, md=4),
+    dbc.Col([
+        html.Strong('Distance function'),
+        html.Br(),
+        html.Span('You can switch the distance metric used. This is experimental.'),
+        dcc.RadioItems(
+            id='dist-function',
+            options=[
+                {'label': 'Euklidean', 'value': 'euklidean'},
+                {'label': 'Manhattan', 'value': 'cityblock'},
+                {'label': 'Cosine', 'value': 'cosine'},
+                {'label': 'Minkowski (2-p norm)', 'value': 'minkowski'}
+            ]
+        )
+    ], xs=12, md=4),
+    dbc.Col([
+
+    ], xs=12, md=4),
     dbc.Col([
         html.P([
             html.Strong('Maximum lag distance'),
@@ -252,12 +267,13 @@ def disable_slider(func_name):
     Input('select-model', 'value'),
     Input('select-estimator', 'value'),
     Input('bin-function', 'value'),
+    Input('dist-function', 'value'),
     Input('n-lags', 'value'),
     Input('fit-function', 'value'),
     Input('fit-sigma', 'value'),
     Input('maxlag', 'data')
 )
-def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, fit_func, fit_sigma, maxlag):
+def estimate_variogram(data_name, model_name, estimator_name, bin_func, dist_func, n_lags, fit_func, fit_sigma, maxlag):
     # if there is no data selected, prevent update
     if data_name is None: 
         raise PreventUpdate
@@ -277,6 +293,7 @@ def estimate_variogram(data_name, model_name, estimator_name, bin_func, n_lags, 
     V = Variogram(c, v, 
         model=model_name,
         estimator=estimator_name,
+        dist_func=dist_func,
         bin_func=bin_func,
         fit_method=fit_func,
         fit_sigma=fit_sigma,
